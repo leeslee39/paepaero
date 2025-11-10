@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수아의 간식창고</title>
+    <style>
+        /* 폰트 및 기본 스타일은 이전과 동일 */
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            background: #FFECF0; /* 핑크빛 크림색 배경 */
+            font-family: 'Press Start 2P', 'sans-serif';
+        }
+
+        .letter-container {
+            background: #ffffff;
+            border: 2px solid #E91E63; /* 핑크색 테두리 */
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 20px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #E91E63; /* 핫핑크 */
+            font-size: 24px;
+            margin-top: 0;
+        }
+
+        /* 편지 내용 */
+        .letter-content {
+            font-family: 'sans-serif'; /* 가독성을 위한 고딕체 */
+            font-size: 16px;
+            color: #333;
+            text-align: left;
+            line-height: 1.7; /* 줄간격 조금 더 */
+            margin: 20px 0;
+            white-space: pre-wrap; /* \n 줄바꿈 인식 */
+        }
+
+        /* 공유하기 버튼 */
+        #shareButton {
+            padding: 15px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            background: #E91E63; /* 핫핑크 버튼 */
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 100%;
+            font-family: 'Press Start 2P', 'sans-serif';
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: background 0.2s;
+        }
+
+        #shareButton:hover {
+            background: #C2185B;
+        }
+
+        #message {
+            margin-top: 15px;
+            font-size: 12px;
+            color: green;
+            font-family: 'sans-serif';
+        }
+    </style>
+</head>
+<body>
+
+    <div class="letter-container">
+        <h1>❤️ MY LOVE, SUA ❤️</h1>
+        
+        <div class="letter-content">
+To. 세상에서 가장 사랑하는 요니에게
+
+꺅! 드디어 클리어했구나! 🥳
+이 어려운 걸 해내다니, 역시 요니야.
+
+내가 만든 이 작은 게임을
+이렇게 열심히 즐겨줘서 정말 고마워.
+
+이 편지는 클리어한 자기만을 위한 선물이야.
+아래 버튼을 눌러서, 이 기쁜 소식을 나에게 얼른 알려줘!
+
+답례로 수아의 까까 창고를 털어서 가득가득 채운 간식을 줄게
+
+(P.S. 넌 게임도 잘하고... 못하는 게 뭐야? 🥰)
+
+From. 요니를 세상에서 제일 사랑하는 수아
+        </div>
+        
+        <button id="shareButton">자기한테 클리어 인증하기! 💌</button>
+        
+        <p id="message"></p>
+    </div>
+
+    <script>
+        const shareButton = document.getElementById('shareButton');
+        const messageEl = document.getElementById('message');
+
+        // 🚨 🚨 🚨 여기가 중요 🚨 🚨 🚨
+        // 개발자(연인)에게 전송될 실제 메시지 내용
+        const shareData = {
+            title: '수아의 간식창고!',
+            text: '오빠야! 나 자기가 만들어준 게임 클리어했어!! ❤️ 얼른 확인해줘! 🥳'
+            // url: 'https://your-game-link.com' // (선택사항)
+        };
+
+        shareButton.addEventListener('click', async () => {
+            // Web Share API (모바일)
+            if (navigator.share) {
+                try {
+                    await navigator.share(shareData);
+                    messageEl.textContent = '공유 완료!';
+                } catch (err) {
+                    messageEl.textContent = '공유가 취소되었어요.';
+                    messageEl.style.color = 'red';
+                }
+            } else {
+                // 클립보드 복사 (PC)
+                try {
+                    await navigator.clipboard.writeText(shareData.text);
+                    messageEl.textContent = '인증 메시지가 클립보드에 복사되었어요! 카톡에 붙여넣어 보내주세요!';
+                    messageEl.style.color = 'green';
+                } catch (err) {
+                    messageEl.textContent = '복사에 실패했어요... 😢';
+                    messageEl.style.color = 'red';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

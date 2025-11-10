@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Sua's Snack Catch!</title>
+    <style>
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            background: #000; 
+        }
+        canvas { 
+            display: block; 
+            background: #90CAF9; 
+            image-rendering: pixelated; 
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        // 1. 기본 설정
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // 2. 게임 변수 설정
+        let score = 0;
+        let snackBaseSpeed = 3; 
+        let gameOver = false;
+        const gravity = 0.2; // 방해물 중력
+
+        // 사운드 객체
+        const catchSound = new Audio('catch.mp3');
+        const gameOverSound = new Audio('gameover.mp3');
+
+        let snackSpawnInterval = 1000; 
+
+        // 3. 이미지 로드 (총 7개 - 변경 없음)
+        const playerImage = new Image();
+        playerImage.src = 'player_basket.png';
+        const throwerImage = new Image();
+        throwerImage.src = 'thrower_character.png';
+        const backgroundImage = new Image();
+        backgroundImage.src = 'background_house_sky.png';
+        const obstacleImage = new Image(); 
+        obstacleImage.src = 'obstacle.png';
+
+        const peperoImage = new Image(); // 빼빼로
+        peperoImage.src = 'pepero_stick.png';
+        const snackBImage = new Image(); // 쿠키
+        snackBImage.src = 'snack_b.png';
+        const snackCImage = new Image(); // 초콜릿 (사탕 대신)
+        snackCImage.src = 'snack_c.png';
+
+
+        let imagesLoaded = 0;
+        const totalImages = 7; 
+
+        function imageLoaded() {
+            imagesLoaded++;
+            if (imagesLoaded === totalImages) {
+                console.log("All images loaded!");
+                gameLoop();
+                spawnSnack(); 
+                setTimeout(spawnObstacle, 3000); 
+            }
+        }
+
+        playerImage.onload = imageLoaded;
+        throwerImage.onload = imageLoaded;
+        backgroundImage.onload = imageLoaded; 
+        obstacleImage.onload = imageLoaded; 
+        peperoImage.onload = imageLoaded;
+        snackBImage.onload = imageLoaded;
+        snackCImage.onload = imageLoaded;
+
+        // 로드 오류 처리 (동일)
+        playerImage.onerror = () => console.error("Failed to load player_basket.png");
+        throwerImage.onerror = () => console.error("Failed to load thrower_character.png");
+        backgroundImage.onerror = () => console.error("Failed to load background_house_sky.png");
+        obstacleImage.onerror = () => console.error("Failed to load obstacle.png");
+        peperoImage.onerror = () => console.error("Failed to load pepero_stick.png");
+        snackBImage.onerror = () => console.error("Failed to load snack_b.png");
+        snackCImage.onerror = () => console.error("Failed to load snack_c.png");
+
+
+        // 바구니 (플레이어) 설정 (동일)
+        const basket = {
+            x: canvas.width / 2 - 50, 
+            y: canvas.height - 200, 
+            width: 100, 
+            height: 180, 
+        };
+        
+        // 던지는 캐릭터 설정 (동일)
+        const thrower = {
+            width: 100, 
+            height: 140,
+            x: canvas.width - 120, 
+            y: canvas.height * 0.35, 
+        };
+
+        // 아이템 배열 (간식 + 방해물) (동일)
+        let items = [];
+
+        // 4. 모바일 터치 컨트롤 (동일)
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault(); 
+            if (gameOver) return;
+            let touchX = e.touches[0].clientX;
+            if (touchX > basket.width / 2 && touchX < canvas.width - basket.width / 2) {
+                basket.x = touchX - basket.width / 2;
+            }
+        }, { passive: false }); 
+
+        canvas.addEventListener('touchstart', () => { if (gameOver) resetGame(); });
+        canvas.addEventListener('mousedown', () => { if (gameOver) resetGame(); });
+
+        // 5. 🚨 생성 함수 수정
+        
+        // 5-1. 🚨 간식 생성 함수 (움직임 로직 변경)
+        function spawnSnack() {
+            if (gameOver) return;
+
+            const rand = Math.random();
+            let snack = {};
+            const startX = Math.random() * (canvas.width - 70);
+
+            if (rand < 0.33) { // 1/3 빼빼로 (수직)
+                snack = {
+                    type: 'snack',
+                    image: peperoImage,
+                    x: startX,
+                    y: 0, 
+                    width: 70, 
+                    height: 100,
+                    velocityY: snackBaseSpeed, // 🚨 추가: 각 아이템별 y 속도
+                    velocityX: 0,
+                    rotation: 0, // 🚨 추가: 회전값
+                    rotationSpeed: 0 // 🚨 추가: 회전 속도
+                };
+            } else if (rand < 0.66) { // 1/3 쿠키 (대각선, 느린 좌우 튕김)
+                snack = {
+                    type: 'snack',
+                    image: snackBImage,
+                    x: startX,
+                    y: 0,
+                    width: 60,
+                    height: 60,
+                    velocityY: snackBaseSpeed * (0.8 + Math.random() * 0.4), // 🚨 변화: 기본 속도에서 +-20%
+                    velocityX: Math.random() > 0.5 ? 1.5 : -1.5, // 🚨 변화: 좌우 속도 조금 느리게
+                    rotation: 0,
+                    rotationSpeed: 0
+                };
+            } else { // 1/3 초콜릿 (회전하며 낙하)
+                snack = {
+                    type: 'snack',
+                    image: snackCImage,
+                    x: startX,
+                    y: 0,
+                    width: 50,
+                    height: 50,
+                    velocityY: snackBaseSpeed * (0.9 + Math.random() * 0.2), // 🚨 변화: 기본 속도에서 +-10%
+                    velocityX: (Math.random() - 0.5) * 1, // 🚨 변화: X축으로도 미세하게 움직임
+                    rotation: Math.random() * Math.PI * 2, // 🚨 추가: 초기 회전값 랜덤
+                    rotationSpeed: (Math.random() > 0.5 ? 0.05 : -0.05) * (0.5 + Math.random()) // 🚨 추가: 회전 속도 랜덤
+                };
+            }
+            items.push(snack);
+
+            // 다음 간식 생성을 예약 (점점 빨라짐)
+            setTimeout(spawnSnack, snackSpawnInterval);
+        }
+
+        // 5-2. 방해물 생성 함수 (동일)
+        function spawnObstacle() {
+            if (gameOver) return;
+
+            const targetX = basket.x + basket.width / 2;
+            const targetY = basket.y + basket.height / 2;
+            const startX = thrower.x + thrower.width / 2;
+            const startY = thrower.y + thrower.height / 2;
+
+            const timeToTargetFrames = 120; // 2초
+            const deltaX = targetX - startX;
+            const deltaY = targetY - startY;
+
+            const velocityX = deltaX / timeToTargetFrames;
+            const velocityY = (deltaY / timeToTargetFrames) - 0.5 * gravity * timeToTargetFrames;
+
+            const obstacleSize = 40;
+            const obstacle = {
+                type: 'obstacle',
+                x: startX - obstacleSize / 2,
+                y: startY - obstacleSize / 2,
+                width: obstacleSize,
+                height: obstacleSize,
+                velocityX: velocityX,
+                velocityY: velocityY,
+                rotation: 0, // 방해물도 회전값 추가
+                rotationSpeed: (Math.random() > 0.5 ? 0.08 : -0.08) * (0.5 + Math.random()) // 방해물 회전 속도
+            };
+            items.push(obstacle);
+
+            const nextObstacleTime = 4000 + Math.random() * 2000;
+            setTimeout(spawnObstacle, nextObstacleTime);
+        }
+
+        // 6. 게임 재시작 함수 (동일)
+        function resetGame() {
+            score = 0;
+            snackBaseSpeed = 3; 
+            snackSpawnInterval = 1000; 
+            items = []; 
+            gameOver = false;
+            gameLoop();
+            spawnSnack(); 
+            setTimeout(spawnObstacle, 3000);
+        }
+
+        function endGame() {
+            gameOver = true;
+            gameOverSound.play();
+        }
+
+        function clearGame() {
+            gameOver = true;
+            alert('축하합니다! 간식 창고가 열립니다!');
+            window.location.href = 'sua_snack_storage.html'; 
+        }
+
+        // 7. 🚨 게임 루프 (물리 업데이트 대폭 수정)
+        function gameLoop() {
+            if (gameOver) {
+                // 게임 오버 화면 (동일)
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'red';
+                ctx.font = '40px "Press Start 2P"';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
+                ctx.fillStyle = 'white';
+                ctx.font = '20px "Press Start 2P"';
+                ctx.fillText('Tap to retry!', canvas.width / 2, canvas.height / 2 + 20);
+                return;
+            }
+
+            // 7.1. 배경 그리기 (동일)
+            if (backgroundImage.complete && backgroundImage.naturalHeight !== 0) {
+                ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // 7.2. 캐릭터 그리기 (동일)
+            if (playerImage.complete) {
+                ctx.drawImage(playerImage, basket.x, basket.y, basket.width, basket.height);
+            }
+            if (throwerImage.complete) {
+                ctx.drawImage(throwerImage, thrower.x, thrower.y, thrower.width, thrower.height);
+            }
+            
+            // 7.3. 🚨 아이템 업데이트 및 그리기 (대폭 수정)
+            for (let i = items.length - 1; i >= 0; i--) {
+                let item = items[i];
+                
+                // 7.3.1. 아이템 이동
+                if (item.type === 'snack') {
+                    item.y += item.velocityY; // 🚨 item.velocityY 사용
+                    item.x += item.velocityX; 
+                    item.rotation += item.rotationSpeed; // 🚨 회전 적용
+
+                    // 화면 좌우 벽에 튕기기 (간식만)
+                    if (item.x <= 0 || item.x + item.width >= canvas.width) {
+                        item.velocityX *= -1; 
+                    }
+                } else if (item.type === 'obstacle') {
+                    item.x += item.velocityX;
+                    item.y += item.velocityY;
+                    item.velocityY += gravity;
+                    item.rotation += item.rotationSpeed; // 🚨 방해물도 회전 적용
+                }
+
+                // 7.3.2. 아이템 그리기 (회전 적용)
+                if (item.image && item.image.complete || (item.type === 'obstacle' && obstacleImage.complete)) {
+                    ctx.save(); // 현재 캔버스 상태 저장
+                    ctx.translate(item.x + item.width / 2, item.y + item.height / 2); // 중심점 이동
+                    ctx.rotate(item.rotation); // 회전
+                    // 이미지 그리기 (중심점을 기준으로 그리기 위해 x, y 위치 보정)
+                    const img = item.type === 'obstacle' ? obstacleImage : item.image;
+                    ctx.drawImage(img, -item.width / 2, -item.height / 2, item.width, item.height);
+                    ctx.restore(); // 저장된 캔버스 상태 복원 (회전 원상복구)
+                }
+                
+                // 7.3.3. 충돌 감지 (바구니와) (동일)
+                if (
+                    item.y + item.height > basket.y &&
+                    item.y < basket.y + basket.height &&
+                    item.x < basket.x + basket.width &&
+                    item.x + item.width > basket.x
+                ) {
+                    if (item.type === 'snack') { 
+                        score++;
+                        snackBaseSpeed += 0.05; 
+                        if (snackSpawnInterval > 300) {
+                            snackSpawnInterval -= 15; 
+                        }
+                        items.splice(i, 1);
+                        catchSound.play();
+                    } else if (item.type === 'obstacle') {
+                        items.splice(i, 1);
+                        endGame(); 
+                        break; 
+                    }
+                } 
+                // 7.3.4. 바닥에 떨어진 아이템 (동일)
+                else if (item.y > canvas.height) {
+                    if (item.type === 'snack') { 
+                        endGame();
+                        break;
+                    } else if (item.type === 'obstacle') {
+                        items.splice(i, 1);
+                    }
+                }
+            }
+            
+            // 7.4. 점수 및 타이틀 표시 (동일)
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 4;
+            ctx.font = '20px "Press Start 2P"'; 
+            ctx.textAlign = 'left';
+            ctx.strokeText(`SCORE: ${score}`, 20, 45);
+            ctx.fillText(`SCORE: ${score}`, 20, 45);
+
+            ctx.textAlign = 'right';
+            ctx.strokeText("수아의 간식창고를 털어라!", canvas.width - 20, 45);
+            ctx.fillText("수아의 간식창고를 털어라!", canvas.width - 20, 45);
+
+            // 7.5. 클리어 여부 확인 (동일)
+            const clearScore = 100;
+            if (score >= clearScore) {
+                clearGame();
+                return;
+            }
+
+            // 7.6. 다음 프레임 요청
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
